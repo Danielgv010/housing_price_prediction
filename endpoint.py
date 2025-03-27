@@ -1,3 +1,5 @@
+import os
+import re
 import flask
 from flask import Flask, request, jsonify
 import tensorflow as tf
@@ -7,8 +9,31 @@ from sklearn.preprocessing import QuantileTransformer
 
 app = Flask(__name__)
 
+def find_best_model_path(model_dir='model'):
+    best_model_path = None
+    lowest_value = float('inf')
+
+    for filename in os.listdir(model_dir):
+        if filename.endswith('.keras'):
+            try:
+                match = re.search(r'-(.*?)(\-|$)', filename)
+                if match:
+                    value = float(match.group(1))
+                    if value < lowest_value:
+                        lowest_value = value
+                        best_model_path = os.path.join(model_dir, filename)
+            except ValueError:
+                print(f"Warning: Could not parse value from filename: {filename}")
+            except Exception as e:
+                print(f"Warning: Error processing filename {filename}: {e}")
+
+    if best_model_path:
+        return best_model_path
+    else:
+        return 'model/0.06-12.86-0.00-0.91.keras'
+
 # Load the trained model
-model = tf.keras.models.load_model('model/0.08-16.12-0.01-0.92.keras', custom_objects={'weighted_mse': lambda y_true, y_pred: tf.reduce_mean(tf.square(y_true - y_pred))})
+model = tf.keras.models.load_model(find_best_model_path(), custom_objects={'weighted_mse': lambda y_true, y_pred: tf.reduce_mean(tf.square(y_true - y_pred))})
 
 # Load the training data for scaling
 df = pd.read_csv('data/processed/train.csv')
